@@ -8,145 +8,77 @@
  *    Ce programme a pour but de faire fontionner un gps (GNSS)
  *
  * Pré-requis            :
- *    Installer la bibliothèque
- *
+ *    Installer les bibliothèque : 
+ *                              - iostream
+ *                              - fstream
+ *                              - string
+ *                              - sstream
+ *                              - thread
+ *                              - chrono
  * Copyright             :
  *    © 2024 Alban de Farcy de Pontfarcy
  **************************************************************************/
 
- #include <iostream>
-#include <fstream>
-#include <string>
-#include <sstream>
-#include <thread>
-#include <chrono>
-
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <fcntl.h>
-#include <termios.h>
-#include <unistd.h>
-#endif
+#include <SoftwareSerial.h>
 
 using namespace std;
 
-// Fonction pour initialiser la connexion série
-bool initSerial(const string& port, int baudRate, int& serialHandle) {
-#ifdef _WIN32
-    serialHandle = CreateFile(port.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (serialHandle == INVALID_HANDLE_VALUE) {
-        cerr << "Erreur : Impossible d'ouvrir le port série !" << endl;
-        return false;
+// Définir les broches de communication pour SoftwareSerial
+const int RXPin = 10; // Broche RX de l'Arduino connectée à TX du SIM868
+const int TXPin = 11; // Broche TX de l'Arduino connectée à RX du SIM868
+
+// Créer une instance de SoftwareSerial
+SoftwareSerial sim868(RXPin, TXPin);
+
+// Fonction pour envoyer une commande AT au module SIM868
+void sendATCommand(const String &command, int delayMs)
+{
+    sim868.println(command);
+    delay(delayMs);
+    while (sim868.available())
+    {
+        Serial.write(sim868.read());
     }
-
-    DCB dcbSerialParams = {0};
-    dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
-    if (!GetCommState(serialHandle, &dcbSerialParams)) {
-        cerr << "Erreur : Impossible d'obtenir les paramètres du port série !" << endl;
-        return false;
-    }
-
-    dcbSerialParams.BaudRate = baudRate;
-    dcbSerialParams.ByteSize = 8;
-    dcbSerialParams.StopBits = ONESTOPBIT;
-    dcbSerialParams.Parity = NOPARITY;
-
-    if (!SetCommState(serialHandle, &dcbSerialParams)) {
-        cerr << "Erreur : Impossible de configurer le port série !" << endl;
-        return false;
-    }
-#else
-    serialHandle = open(port.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
-    if (serialHandle < 0) {
-        cerr << "Erreur : Impossible d'ouvrir le port série !" << endl;
-        return false;
-    }
-
-    termios tty = {0};
-    if (tcgetattr(serialHandle, &tty) != 0) {
-        cerr << "Erreur : Impossible d'obtenir les attributs du port série !" << endl;
-        return false;
-    }
-
-    cfsetospeed(&tty, baudRate);
-    cfsetispeed(&tty, baudRate);
-
-    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8; // 8 bits de données
-    tty.c_iflag = 0;                           // Pas de contrôle
-    tty.c_oflag = 0;                           // Pas de traitement
-    tty.c_lflag = 0;                           // Pas de mode canonique
-
-    if (tcsetattr(serialHandle, TCSANOW, &tty) != 0) {
-        cerr << "Erreur : Impossible de configurer le port série !" << endl;
-        return false;
-    }
-#endif
-    return true;
 }
 
-// Fonction pour envoyer des commandes AT au module
-void sendATCommand(int serialHandle, const string& command) {
-    string fullCommand = command + "\r\n";
-#ifdef _WIN32
-    DWORD bytesWritten;
-    WriteFile(serialHandle, fullCommand.c_str(), fullCommand.size(), &bytesWritten, NULL);
-#else
-    write(serialHandle, fullCommand.c_str(), fullCommand.size());
-#endif
-    this_thread::sleep_for(chrono::milliseconds(100));
-}
+// Initialisation
+void setup()
+{
+    Serial.begin(9600); // Initialiser le port série pour le débogage
+    sim868.begin(9600); // Initialiser le port série pour le SIM868
 
-// Fonction pour lire les données GPS du module
-string readSerial(int serialHandle) {
-    char buffer[256];
-    string result;
-
-#ifdef _WIN32
-    DWORD bytesRead;
-    ReadFile(serialHandle, buffer, sizeof(buffer), &bytesRead, NULL);
-    result.assign(buffer, bytesRead);
-#else
-    int bytesRead = read(serialHandle, buffer, sizeof(buffer));
-    if (bytesRead > 0) {
-        result.assign(buffer, bytesRead);
-    }
-#endif
-    return result;
-}
-
-int main() {
-    string port = "/dev/ttyS0"; // Remplacez par le port série utilisé (par exemple, COM3 sous Windows)
-    int baudRate = 9600;       // Baud rate recommandé pour SIM868
-    int serialHandle;
-
-    if (!initSerial(port, baudRate, serialHandle)) {
-        return 1;
-    }
-
-    cout << "Initialisation du module SIM868..." << endl;
-
+    Serial.println("Initialisation du module SIM868...");
+    
+    // Vérifier la communication avec le module
+    sendATCommand("AT", 1000);
+    
     // Activer le GPS
-    sendATCommand(serialHandle, "AT+CGNSPWR=1");
-    this_thread::sleep_for(chrono::seconds(2));
+    sendATCommand("AT+CGPSPWR=1", 1000);
+    
+    // Configurer le GPS en mode de base
+    sendATCommand("AT+CGPSRST=0", 1000);
+}
 
-    // Vérifier l'état GPS
-    sendATCommand(serialHandle, "AT+CGNSINF");
+void loop()
+{
+    // Demander les données GPS
+    sendATCommand("AT+CGPSINF=0", 1000);
 
-    // Lire les données GPS
-    while (true) {
-        string response = readSerial(serialHandle);
-        if (!response.empty()) {
-            cout << "Données GPS : " << response << endl;
+    // Lecture et affichage des données GPS
+    if
+    {
+        sim868.available()
+        {
+            Serial.println("Données GPS reçues:");
+            while
+            {
+                sim868.available()
+                {
+                    Serial.write(sim868.read());
+                }
+            }
         }
-        this_thread::sleep_for(chrono::seconds(1));
     }
-
-#ifdef _WIN32
-    CloseHandle(serialHandle);
-#else
-    close(serialHandle);
-#endif
-
-    return 0;
+    
+    delay(5000); // Attendre avant de demander à nouveau les données
 }
